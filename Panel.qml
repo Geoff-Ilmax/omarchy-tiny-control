@@ -42,6 +42,16 @@ Panel {
   property bool autoWb: true
   property int wbTemp: 4000
   property bool hdr: false
+  // Gimbal (UVC readback = last host-commanded angle; see tinyctl README).
+  property real panDeg: 0
+  property real tiltDeg: 0
+  property int zoomVal: 0
+  property real panMin: -130
+  property real panMax: 130
+  property real tiltMin: -90
+  property real tiltMax: 90
+  property int gimbalStep: 5
+  readonly property bool tracking_on: tracking !== "off"
 
   // Tracking modes this model supports (from `tinyctl support --json`).
   property var trackModes: []
@@ -154,6 +164,23 @@ Panel {
     root.actionError = ""
     actionProc.command = ["tinyctl", "-c", root.selectedId].concat(args)
     actionProc.running = true
+  }
+
+  // Step the gimbal from its last known position, within the camera's range.
+  function nudgePan(dir) {
+    var t = Math.max(root.panMin, Math.min(root.panMax, Math.round(root.panDeg + dir * root.gimbalStep)))
+    root.panDeg = t
+    root.act(["pan", String(t)])
+  }
+  function nudgeTilt(dir) {
+    var t = Math.max(root.tiltMin, Math.min(root.tiltMax, Math.round(root.tiltDeg + dir * root.gimbalStep)))
+    root.tiltDeg = t
+    root.act(["tilt", String(t)])
+  }
+  function nudgeZoom(dir) {
+    var t = Math.max(0, Math.min(100, root.zoomVal + dir * 10))
+    root.zoomVal = t
+    root.act(["zoom", String(t)])
   }
 
   function selectCamera(id) {
@@ -270,6 +297,11 @@ Panel {
           root.autoWb = j.auto_wb === true
           root.wbTemp = j.wb_temp | 0
           root.hdr = j.hdr === true
+          root.panDeg = Number(j.pan_deg) || 0
+          root.tiltDeg = Number(j.tilt_deg) || 0
+          root.zoomVal = j.zoom | 0
+          if (j.pan_range) { root.panMin = j.pan_range[0]; root.panMax = j.pan_range[1] }
+          if (j.tilt_range) { root.tiltMin = j.tilt_range[0]; root.tiltMax = j.tilt_range[1] }
           root.stateValid = true
         } catch (e) {
           root.stateValid = false
@@ -565,15 +597,56 @@ Panel {
           onChanged: function(v) { root.previewRes = v }
         }
 
-        Button {
+        // --- gimbal ---
+        PanelSeparator { foreground: root.fg; visible: root.haveCam }
+        Text {
           width: parent.width
           visible: root.haveCam
-          leftAlign: true
-          foreground: root.fg
-          text: "Recenter gimbal"
-          enabled: !root.busy
-          onClicked: root.act(["recenter"])
+          color: root.fg
+          font.family: root.fam
+          font.pixelSize: Style.font.caption
+          wrapMode: Text.WordWrap
+          text: "Gimbal · pan " + Math.round(root.panDeg) + "°, tilt " + Math.round(root.tiltDeg)
+                + "°, zoom " + root.zoomVal
+                + (root.tracking_on ? "\nAI tracking is steering — turn it off to move manually" : "")
         }
+        Row {
+          id: padRow
+          visible: root.haveCam
+          width: parent.width
+          spacing: Style.space(4)
+          readonly property real cell: (width - spacing * 3) / 4
+          readonly property bool can: root.stateValid && !root.busy && !root.asleep && !root.tracking_on
+          Button { width: padRow.cell; foreground: root.fg; text: "◀"; enabled: padRow.can; onClicked: root.nudgePan(-1) }
+          Button { width: padRow.cell; foreground: root.fg; text: "▲"; enabled: padRow.can; onClicked: root.nudgeTilt(1) }
+          Button { width: padRow.cell; foreground: root.fg; text: "▼"; enabled: padRow.can; onClicked: root.nudgeTilt(-1) }
+          Button { width: padRow.cell; foreground: root.fg; text: "▶"; enabled: padRow.can; onClicked: root.nudgePan(1) }
+        }
+        Row {
+          id: zoomRow
+          visible: root.haveCam
+          width: parent.width
+          spacing: Style.space(4)
+          readonly property real cell: (width - spacing * 2) / 3
+          readonly property bool can: root.stateValid && !root.busy && !root.asleep
+          Button { width: zoomRow.cell; foreground: root.fg; text: "Zoom −"; enabled: zoomRow.can; onClicked: root.nudgeZoom(-1) }
+          Button { width: zoomRow.cell; foreground: root.fg; text: "Zoom +"; enabled: zoomRow.can; onClicked: root.nudgeZoom(1) }
+          Button { width: zoomRow.cell; foreground: root.fg; text: "Center"; enabled: zoomRow.can && !root.tracking_on; onClicked: root.act(["recenter"]) }
+        }
+        Dropdown {
+          width: parent.width
+          visible: root.haveCam
+          label: "Step"
+          value: String(root.gimbalStep)
+          options: [
+            { value: "2", label: "2°" },
+            { value: "5", label: "5°" },
+            { value: "10", label: "10°" },
+            { value: "20", label: "20°" }
+          ]
+          onChanged: function(v) { root.gimbalStep = parseInt(v) }
+        }
+        PanelSeparator { foreground: root.fg; visible: root.haveCam }
         Button {
           width: parent.width
           visible: root.haveCam
