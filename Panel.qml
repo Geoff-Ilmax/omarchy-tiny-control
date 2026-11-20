@@ -50,7 +50,9 @@ Panel {
   property real panMax: 130
   property real tiltMin: -90
   property real tiltMax: 90
-  property int gimbalStep: 5
+  // 5° steps; "Fine control" switches to 1°.
+  property bool fineControl: false
+  readonly property int gimbalStep: fineControl ? 1 : 5
   readonly property bool tracking_on: tracking !== "off"
 
   // Tracking modes this model supports (from `tinyctl support --json`).
@@ -610,41 +612,48 @@ Panel {
                 + "°, zoom " + root.zoomVal
                 + (root.tracking_on ? "\nAI tracking is steering — turn it off to move manually" : "")
         }
-        Row {
-          id: padRow
+        // D-pad: up on top, left / center / right in the middle, down below.
+        Item {
           visible: root.haveCam
           width: parent.width
-          spacing: Style.space(4)
-          readonly property real cell: (width - spacing * 3) / 4
-          readonly property bool can: root.stateValid && !root.busy && !root.asleep && !root.tracking_on
-          Button { width: padRow.cell; foreground: root.fg; text: "◀"; enabled: padRow.can; onClicked: root.nudgePan(-1) }
-          Button { width: padRow.cell; foreground: root.fg; text: "▲"; enabled: padRow.can; onClicked: root.nudgeTilt(1) }
-          Button { width: padRow.cell; foreground: root.fg; text: "▼"; enabled: padRow.can; onClicked: root.nudgeTilt(-1) }
-          Button { width: padRow.cell; foreground: root.fg; text: "▶"; enabled: padRow.can; onClicked: root.nudgePan(1) }
+          implicitHeight: pad.implicitHeight
+          Grid {
+            id: pad
+            anchors.horizontalCenter: parent.horizontalCenter
+            columns: 3
+            spacing: Style.space(4)
+            readonly property real cell: Style.space(56)
+            readonly property bool can: root.stateValid && !root.busy && !root.asleep && !root.tracking_on
+            Item { width: pad.cell; height: 1 }
+            Button { width: pad.cell; foreground: root.fg; text: "▲"; enabled: pad.can; onClicked: root.nudgeTilt(1) }
+            Item { width: pad.cell; height: 1 }
+            Button { width: pad.cell; foreground: root.fg; text: "◀"; enabled: pad.can; onClicked: root.nudgePan(-1) }
+            Button { width: pad.cell; foreground: root.fg; text: "⌖"; enabled: pad.can; onClicked: root.act(["recenter"]) }
+            Button { width: pad.cell; foreground: root.fg; text: "▶"; enabled: pad.can; onClicked: root.nudgePan(1) }
+            Item { width: pad.cell; height: 1 }
+            Button { width: pad.cell; foreground: root.fg; text: "▼"; enabled: pad.can; onClicked: root.nudgeTilt(-1) }
+            Item { width: pad.cell; height: 1 }
+          }
         }
         Row {
           id: zoomRow
           visible: root.haveCam
           width: parent.width
           spacing: Style.space(4)
-          readonly property real cell: (width - spacing * 2) / 3
+          readonly property real cell: (width - spacing) / 2
           readonly property bool can: root.stateValid && !root.busy && !root.asleep
           Button { width: zoomRow.cell; foreground: root.fg; text: "Zoom −"; enabled: zoomRow.can; onClicked: root.nudgeZoom(-1) }
           Button { width: zoomRow.cell; foreground: root.fg; text: "Zoom +"; enabled: zoomRow.can; onClicked: root.nudgeZoom(1) }
-          Button { width: zoomRow.cell; foreground: root.fg; text: "Center"; enabled: zoomRow.can && !root.tracking_on; onClicked: root.act(["recenter"]) }
         }
-        Dropdown {
+        SwitchRow {
           width: parent.width
           visible: root.haveCam
-          label: "Step"
-          value: String(root.gimbalStep)
-          options: [
-            { value: "2", label: "2°" },
-            { value: "5", label: "5°" },
-            { value: "10", label: "10°" },
-            { value: "20", label: "20°" }
-          ]
-          onChanged: function(v) { root.gimbalStep = parseInt(v) }
+          label: "Fine control"
+          sub: root.fineControl ? "1° steps" : "5° steps"
+          value: root.fineControl
+          fg: root.fg
+          fam: root.fam
+          onSwitched: root.fineControl = !root.fineControl
         }
         PanelSeparator { foreground: root.fg; visible: root.haveCam }
         Button {
