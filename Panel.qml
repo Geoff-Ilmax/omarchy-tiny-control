@@ -53,6 +53,9 @@ Panel {
   // 5° steps; "Fine control" switches to 1°.
   property bool fineControl: false
   readonly property int gimbalStep: fineControl ? 1 : 5
+  // "Reverse controls" inverts both axes of the D-pad.
+  property bool reverseControls: false
+  readonly property int gimbalDir: reverseControls ? -1 : 1
   // Modes where the camera steers the gimbal itself. Desk mode only frames
   // the desk, so manual adjustment stays available there.
   readonly property bool tracking_on: tracking !== "off" && tracking !== "desk"
@@ -189,12 +192,12 @@ Panel {
 
   // Step the gimbal from its last known position, within the camera's range.
   function nudgePan(dir) {
-    var t = Math.max(root.panMin, Math.min(root.panMax, Math.round(root.panDeg + dir * root.gimbalStep)))
+    var t = Math.max(root.panMin, Math.min(root.panMax, Math.round(root.panDeg + dir * root.gimbalDir * root.gimbalStep)))
     root.panDeg = t
     root.act(["pan", String(t)])
   }
   function nudgeTilt(dir) {
-    var t = Math.max(root.tiltMin, Math.min(root.tiltMax, Math.round(root.tiltDeg + dir * root.gimbalStep)))
+    var t = Math.max(root.tiltMin, Math.min(root.tiltMax, Math.round(root.tiltDeg + dir * root.gimbalDir * root.gimbalStep)))
     root.tiltDeg = t
     root.act(["tilt", String(t)])
   }
@@ -661,6 +664,16 @@ Panel {
           fg: root.fg
           fam: root.fam
           onSwitched: root.fineControl = !root.fineControl
+        }
+        SwitchRow {
+          width: parent.width
+          visible: root.haveCam
+          label: "Reverse controls"
+          sub: root.reverseControls ? "arrows inverted" : ""
+          value: root.reverseControls
+          fg: root.fg
+          fam: root.fam
+          onSwitched: root.reverseControls = !root.reverseControls
         }
         PanelSeparator { foreground: root.fg; visible: root.haveCam }
         Dropdown {
