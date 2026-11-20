@@ -23,8 +23,10 @@ it is the front-end for [tiny-control](https://github.com/Geoff-Ilmax/tiny-contr
 - **Popup** — switches for sleep/wake, AI tracking, HDR and auto white balance;
   a tracking-mode picker that only offers modes the camera's model supports;
   buttons for the camera's own presets 1–3 (named as in OBSBOT Center, power-on
-  preset marked); a preview-resolution picker; recenter; and **Live preview**
-  for the selected camera.
+  preset marked); gimbal controls (◀ ▲ ▼ ▶ in 2–20° steps within the
+  camera's range, zoom −/+, center — the pad is disabled while AI tracking is
+  steering); a preview-resolution picker; and **Live preview** for the
+  selected camera.
 
 The popup polls the selected camera's real state once per second while open.
 Switches reflect confirmed readback rather than an optimistic local value.
