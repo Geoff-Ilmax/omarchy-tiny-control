@@ -53,7 +53,9 @@ Panel {
   // 5° steps; "Fine control" switches to 1°.
   property bool fineControl: false
   readonly property int gimbalStep: fineControl ? 1 : 5
-  readonly property bool tracking_on: tracking !== "off"
+  // Modes where the camera steers the gimbal itself. Desk mode only frames
+  // the desk, so manual adjustment stays available there.
+  readonly property bool tracking_on: tracking !== "off" && tracking !== "desk"
 
   // Tracking modes this model supports (from `tinyctl support --json`).
   property var trackModes: []
@@ -136,6 +138,23 @@ Panel {
       checked: sr.value
       foreground: sr.fg
       onToggled: sr.switched()
+    }
+  }
+
+  // A D-pad key: a stock Button with no text and a large glyph drawn on top,
+  // so the arrow can be bigger than the theme's button text.
+  component PadButton: Button {
+    id: pb
+    property string glyph: ""
+    text: ""
+    foreground: root.fg
+    Text {
+      anchors.centerIn: parent
+      text: pb.glyph
+      color: root.fg
+      opacity: pb.enabled ? 1 : 0.35
+      font.family: root.fam
+      font.pixelSize: Math.round(Style.font.subtitle * 2)
     }
   }
 
@@ -597,7 +616,7 @@ Panel {
           wrapMode: Text.WordWrap
           text: "Gimbal · pan " + Math.round(root.panDeg) + "°, tilt " + Math.round(root.tiltDeg)
                 + "°, zoom " + root.zoomVal
-                + (root.tracking_on ? "\nAI tracking is steering — turn it off to move manually" : "")
+                + (root.tracking_on ? "\nAI tracking is steering — turn it off (or use Desk mode) to move manually" : "")
         }
         // D-pad: up on top, left / center / right in the middle, down below.
         Item {
@@ -613,13 +632,13 @@ Panel {
             readonly property real cellH: Style.space(52)
             readonly property bool can: root.stateValid && !root.busy && !root.asleep && !root.tracking_on
             Item { width: pad.cell; height: pad.cellH }
-            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "▲"; enabled: pad.can; onClicked: root.nudgeTilt(1) }
+            PadButton { width: pad.cell; height: pad.cellH; glyph: "▲"; enabled: pad.can; onClicked: root.nudgeTilt(1) }
             Item { width: pad.cell; height: pad.cellH }
-            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "◀"; enabled: pad.can; onClicked: root.nudgePan(1) }
-            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "⌖"; enabled: pad.can; onClicked: root.act(["recenter"]) }
-            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "▶"; enabled: pad.can; onClicked: root.nudgePan(-1) }
+            PadButton { width: pad.cell; height: pad.cellH; glyph: "◀"; enabled: pad.can; onClicked: root.nudgePan(1) }
+            PadButton { width: pad.cell; height: pad.cellH; glyph: "⌖"; enabled: pad.can; onClicked: root.act(["recenter"]) }
+            PadButton { width: pad.cell; height: pad.cellH; glyph: "▶"; enabled: pad.can; onClicked: root.nudgePan(-1) }
             Item { width: pad.cell; height: pad.cellH }
-            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "▼"; enabled: pad.can; onClicked: root.nudgeTilt(-1) }
+            PadButton { width: pad.cell; height: pad.cellH; glyph: "▼"; enabled: pad.can; onClicked: root.nudgeTilt(-1) }
             Item { width: pad.cell; height: pad.cellH }
           }
         }

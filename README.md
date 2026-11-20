@@ -25,7 +25,7 @@ it is the front-end for [tiny-control](https://github.com/Geoff-Ilmax/tiny-contr
   buttons for the camera's own presets 1–3 (named as in OBSBOT Center, power-on
   preset marked); a gimbal D-pad (▲ ◀ ⌖ ▶ ▼, 5° steps or
   1° with **Fine control**, within the camera's range; ⌖ recenters; disabled
-  while AI tracking is steering) and zoom −/+; a preview-resolution picker; and **Live preview** for the
+  while AI tracking is steering, but available in Desk mode) and zoom −/+; a preview-resolution picker; and **Live preview** for the
   selected camera.
 
 The popup polls the selected camera's real state once per second while open.
