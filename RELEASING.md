@@ -12,7 +12,7 @@ uploaded by hand.
 4. Commit, then tag and push:
 
    ```bash
-   git tag -a v1.0.0 -m "OBSBOT Tiny 3 widget v1.0.0"
+   git tag -a v2.0.0 -m "tiny-control widget v2.0.0"
    git push origin main --follow-tags
    ```
 
@@ -23,8 +23,8 @@ disagree, or if the plugin fails validation.
 
 | Asset | Notes |
 |---|---|
-| `omarchy-obsbot-tiny3-<ver>.tar.gz` | Plugin archive, rooted at the plugin id |
-| `omarchy-obsbot-tiny3-<ver>.zip` | Same contents, zip |
+| `omarchy-tiny-control-<ver>.tar.gz` | Plugin archive, rooted at the plugin id |
+| `omarchy-tiny-control-<ver>.zip` | Same contents, zip |
 | `SHA256SUMS` | Covers both archives |
 
 Both archives also get a [Sigstore build-provenance
@@ -32,18 +32,18 @@ attestation](https://docs.github.com/actions/security-guides/using-artifact-atte
 so a consumer can prove an artifact came from this repo's workflow at that tag:
 
 ```bash
-gh attestation verify omarchy-obsbot-tiny3-<ver>.tar.gz \
-  --repo joshualambert/omarchy-obsbot-tiny3
+gh attestation verify omarchy-tiny-control-<ver>.tar.gz \
+  --repo Geoff-Ilmax/omarchy-tiny-control
 ```
 
-The archive root is the plugin id (`io.github.joshualambert.obsbot-tiny3`), so
+The archive root is the plugin id (`io.github.geoff-ilmax.tiny-control`), so
 `tar xzf … -C ~/.config/omarchy/plugins/` installs it in place.
 
 ## Relationship to the CLI
 
 This widget is a front end for
-[obsbot-tiny3-linux](https://github.com/joshualambert/obsbot-tiny3-linux), which
+[tiny-control](https://github.com/Geoff-Ilmax/tiny-control), which
 has its own release pipeline with the same guarantees (checksums, provenance,
 and a PKGBUILD that pins its source tarball by `sha256`). The two version
-independently; the widget only requires that `t3ctl` and `t3-preview` are on
+independently; the widget only requires that `tinyctl` and `tiny-preview` are on
 `PATH`.

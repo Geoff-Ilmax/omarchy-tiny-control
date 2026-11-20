@@ -1,98 +1,102 @@
-# OBSBOT Tiny 3 — Omarchy bar widget
+# Tiny Control — Omarchy bar widget
 
-A native [Omarchy](https://omarchy.org/) / Quickshell bar widget to control an
-**OBSBOT Tiny 3 series** webcam: a camera icon in the bar that opens a popup with
-sleep/wake, AI tracking, HDR, white balance, a preview-resolution picker, and a
-live video preview.
+A native [Omarchy](https://omarchy.org/) / Quickshell bar widget for **OBSBOT
+Tiny 2 and Tiny 3 series** webcams — one widget for every connected camera. A
+camera icon in the bar opens a popup with a camera picker, sleep/wake, AI
+tracking and mode, the camera's presets, HDR, white balance, and a live preview.
+
+Forked from Josh Lambert's
+[omarchy-obsbot-tiny3](https://github.com/joshualambert/omarchy-obsbot-tiny3);
+it is the front-end for [tiny-control](https://github.com/Geoff-Ilmax/tiny-control).
 
 <p align="center">
-  <img src="preview.png" alt="OBSBOT Tiny 3 bar widget" width="360">
+  <img src="preview.png" alt="Tiny Control bar widget" width="360">
 </p>
 
-- **Bar icon** — pulses while the camera is in use; left-click opens the popup,
-  right-click toggles sleep, middle-click opens the live preview.
-- **Popup** — toggle switches for sleep/wake, AI tracking, HDR, and auto white
-  balance; a preview-resolution dropdown (720p/1080p/2160p); recenter; and a
-  **Live preview** button.
+- **Camera picker** — choose any connected camera. The choice becomes
+  `tinyctl`'s *selected* camera, so the keybindings and menu snippets that use
+  `tinyctl -c selected …` act on the same camera. Until a camera is chosen the
+  controls stay disabled; nothing acts on an implicit default.
+- **Bar icon** — pulses while the selected camera is in use; left-click opens
+  the popup, right-click toggles sleep, middle-click opens the live preview, all
+  for the selected camera. The tooltip names it.
+- **Tabs** — **Camera** (switches, tracking mode, presets, power-on preset,
+  preview), **Gimbal** (position, D-pad, zoom, fine control, axis swaps) and
+  **Image** (hue, contrast, saturation and sharpness with −/+ in steps of 5,
+  or 1 with Fine control, and a reset to the camera's defaults).
+- **Popup** — switches for sleep/wake, AI tracking, HDR and auto white balance;
+  a tracking-mode picker that only offers modes the camera's model supports;
+  buttons for the camera's own presets 1–3 (named as in OBSBOT Center, power-on
+  preset marked) and a **Power-on preset** picker on models where tinyctl's
+  power-on copy is verified (the Tiny 2); a gimbal D-pad (▲ ◀ ⌖ ▶ ▼, 5° steps or
+  1° with **Fine control**, **Swap left/right** and **Swap up/down** to invert an axis — all three saved per camera by tinyctl — within the camera's range; ⌖ recenters; disabled
+  while AI tracking is steering, but available in Desk mode) and zoom −/+; a preview-resolution picker; and **Live preview** for the
+  selected camera.
 
-The popup polls real camera state once per second while open. Switches reflect
-confirmed readback, including Sleep, rather than an optimistic local value.
-Commands run serially, wait for completion and surface failures in the popup.
-Unavailable state disables the switches. The popup also reports whether the
-settings guard is running.
+The popup polls the selected camera's real state once per second while open.
+Switches reflect confirmed readback rather than an optimistic local value.
+Commands run one at a time, wait for completion and surface errors in the
+popup. The popup also reports whether `tiny-guard` is running.
 
 Awake selects persistent keep-awake mode; Sleep remains authoritative even
 during calls. **Wake automatically for calls** selects automatic wake for video
 or microphone use. Saved tracking, HDR and white-balance choices are enforced
-by the companion driver guard. Closing preview does not release an explicit
-keep-awake choice; use Sleep or automatic mode.
-
-These additions require the matching persistent-settings update to
-`obsbot-tiny3-linux` (not the older v0.1.0 release). Install both updates together.
-The source still works without the optional processed microphone service;
-for call audio setup, see the driver's README.
+per camera by `tiny-guard`. Recalling a preset also applies its Additional
+settings (tracking mode, image values, white balance) as OBSBOT Center does.
 
 ## Requirements
 
-This widget is a front-end for the **obsbot-tiny3-linux** CLI. Install that
-project **first** from one of its
-[tagged releases](https://github.com/joshualambert/obsbot-tiny3-linux/releases)
-— every release ships checksummed, provenance-attested binaries and `.deb` /
-`.rpm` / Arch packages, so you can verify what you install rather than building
-whatever is on `main`:
+This widget is a front-end for the **tiny-control** CLI, **v0.2.0 or later**.
+Install it first — see its README:
+<https://github.com/Geoff-Ilmax/tiny-control>. The `tinyctl` and
+`tiny-preview` commands must be on your `PATH`, and `tiny-guard.service` should
+be enabled.
 
-```bash
-VER=0.1.0
-REL=https://github.com/joshualambert/obsbot-tiny3-linux/releases/download/v$VER
+The live preview additionally uses [`mpv`](https://mpv.io/). This widget itself
+installs nothing, runs no privileged commands, and writes no configuration of
+its own — it only invokes `tinyctl` and `tiny-preview`. (Choosing a camera runs
+`tinyctl select`, which records the selection in tinyctl's own state file.)
 
-curl -fLO "$REL/obsbot-tiny3-linux-$VER-x86_64-linux-musl.tar.gz"
-curl -fLO "$REL/SHA256SUMS"
-sha256sum --check --ignore-missing SHA256SUMS      # must print: OK
-
-tar xzf "obsbot-tiny3-linux-$VER-x86_64-linux-musl.tar.gz"
-cd "obsbot-tiny3-linux-$VER-x86_64-linux-musl" && ./install.sh
-```
-
-Afterwards the `t3ctl` and `t3-preview` commands it provides must be on your
-`PATH`. See that project's README for the `.deb`/`.rpm`/Arch package routes and
-for `gh attestation verify`.
-
-The live preview additionally uses [`mpv`](https://mpv.io/) (install it with your
-distribution's package manager). This widget itself installs nothing, runs no
-privileged commands, and writes no configuration of its own — it only invokes the
-`t3ctl` / `t3-preview` commands you installed above.
+Coming from the upstream widget (`io.github.joshualambert.obsbot-tiny3`)?
+Remove that one first; this plugin has a different id and uses the renamed
+`tinyctl` commands.
 
 ## Install
 
-From the Omarchy plugin marketplace:
-
-```
-omarchy plugin install io.github.joshualambert.obsbot-tiny3
-```
-
-### Or install a pinned release by hand
+### A pinned release by hand
 
 Every `v*` tag publishes an archive plus a `SHA256SUMS` file and a
 [Sigstore build-provenance attestation](https://docs.github.com/actions/security-guides/using-artifact-attestations)
-— see [**Releases**](https://github.com/joshualambert/omarchy-obsbot-tiny3/releases).
+— see [**Releases**](https://github.com/Geoff-Ilmax/omarchy-tiny-control/releases).
 The archive's root directory is the plugin id, so it extracts straight into your
 plugins folder:
 
 ```bash
-VER=1.0.0
-REL=https://github.com/joshualambert/omarchy-obsbot-tiny3/releases/download/v$VER
+VER=2.0.0
+REL=https://github.com/Geoff-Ilmax/omarchy-tiny-control/releases/download/v$VER
 
-curl -fLO "$REL/omarchy-obsbot-tiny3-$VER.tar.gz"
+curl -fLO "$REL/omarchy-tiny-control-$VER.tar.gz"
 curl -fLO "$REL/SHA256SUMS"
 sha256sum --check --ignore-missing SHA256SUMS      # must print: OK
 
 # optional: prove the archive came from this repo's release workflow
-gh attestation verify "omarchy-obsbot-tiny3-$VER.tar.gz" \
-  --repo joshualambert/omarchy-obsbot-tiny3
+gh attestation verify "omarchy-tiny-control-$VER.tar.gz" \
+  --repo Geoff-Ilmax/omarchy-tiny-control
 
 mkdir -p ~/.config/omarchy/plugins
-tar xzf "omarchy-obsbot-tiny3-$VER.tar.gz" -C ~/.config/omarchy/plugins/
-omarchy plugin enable io.github.joshualambert.obsbot-tiny3
+tar xzf "omarchy-tiny-control-$VER.tar.gz" -C ~/.config/omarchy/plugins/
+omarchy-shell shell rescanPlugins
+omarchy plugin enable io.github.geoff-ilmax.tiny-control
+```
+
+### From a git checkout
+
+```bash
+mkdir -p ~/.config/omarchy/plugins/io.github.geoff-ilmax.tiny-control
+cp manifest.json Panel.qml README.md LICENSE preview.png \
+   ~/.config/omarchy/plugins/io.github.geoff-ilmax.tiny-control/
+omarchy-shell shell rescanPlugins     # make the shell notice a hand-copied plugin
+omarchy plugin enable io.github.geoff-ilmax.tiny-control
 ```
 
 ### Add it to your bar
@@ -101,7 +105,7 @@ Put this entry in the `right` (or `left` / `center`) list under `bar.layout` in
 `~/.config/omarchy/shell.json`:
 
 ```json
-{ "id": "io.github.joshualambert.obsbot-tiny3" }
+{ "id": "io.github.geoff-ilmax.tiny-control" }
 ```
 
 and reload the shell:
@@ -112,16 +116,14 @@ omarchy restart shell
 
 ## Removal
 
-Remove the `{ "id": "io.github.joshualambert.obsbot-tiny3" }` entry from
+Remove the `{ "id": "io.github.geoff-ilmax.tiny-control" }` entry from
 `~/.config/omarchy/shell.json`, then:
 
 ```
-omarchy plugin disable io.github.joshualambert.obsbot-tiny3
-omarchy plugin remove io.github.joshualambert.obsbot-tiny3
+omarchy plugin disable io.github.geoff-ilmax.tiny-control
+omarchy plugin remove io.github.geoff-ilmax.tiny-control
 omarchy restart shell
 ```
-
-The widget writes no configuration of its own and never modifies your files.
 
 ## Development
 
@@ -132,5 +134,5 @@ workflow runs it again before publishing. Releasing is documented in
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE). Part of the **obsbot-tiny3-linux** project:
-<https://github.com/joshualambert/obsbot-tiny3-linux>
+MIT — see [`LICENSE`](LICENSE). Part of the **tiny-control** project:
+<https://github.com/Geoff-Ilmax/tiny-control>
