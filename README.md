@@ -78,6 +78,7 @@ gh attestation verify "omarchy-tiny-control-$VER.tar.gz" \
 
 mkdir -p ~/.config/omarchy/plugins
 tar xzf "omarchy-tiny-control-$VER.tar.gz" -C ~/.config/omarchy/plugins/
+omarchy-shell shell rescanPlugins
 omarchy plugin enable io.github.geoff-ilmax.tiny-control
 ```
 
@@ -87,6 +88,7 @@ omarchy plugin enable io.github.geoff-ilmax.tiny-control
 mkdir -p ~/.config/omarchy/plugins/io.github.geoff-ilmax.tiny-control
 cp manifest.json Panel.qml README.md LICENSE preview.png \
    ~/.config/omarchy/plugins/io.github.geoff-ilmax.tiny-control/
+omarchy-shell shell rescanPlugins     # make the shell notice a hand-copied plugin
 omarchy plugin enable io.github.geoff-ilmax.tiny-control
 ```
 
