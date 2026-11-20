@@ -36,7 +36,10 @@ Panel {
   property string actionError: ""
   property string powerPolicy: "auto"
   property bool guardActive: false
-  readonly property bool busy: actionProc.running || statusProc.running || selectProc.running
+  // Only the user's own commands count as busy. The once-a-second status
+  // poll does not, so the popup never flickers or drops a click because of
+  // it (tinyctl serializes camera access itself).
+  readonly property bool busy: actionProc.running || selectProc.running
   property bool asleep: false
   property string tracking: "off"
   property bool autoWb: true
@@ -631,7 +634,7 @@ Panel {
           Text {
             width: parent.width
             visible: root.haveCam
-            text: root.busy ? "Checking camera…" : "Power: " + root.powerPolicy + (root.guardActive ? " · guard active" : " · guard not running")
+            text: "Power: " + root.powerPolicy + (root.guardActive ? " · guard active" : " · guard not running")
             color: root.fg
             font.pixelSize: Style.font.caption
           }
