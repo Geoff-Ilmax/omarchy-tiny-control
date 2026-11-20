@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.joshualambert.obsbot-tiny3",
-  "name": "OBSBOT Tiny 3",
-  "version": "1.0.0",
-  "author": "obsbot-tiny3-linux",
-  "description": "OBSBOT Tiny 3 camera control: sleep/wake, AI tracking, white balance, and a live preview",
+  "id": "io.github.geoff-ilmax.tiny-control",
+  "name": "Tiny Control",
+  "version": "2.0.0",
+  "author": "tiny-control",
+  "description": "OBSBOT Tiny 2 / Tiny 3 camera control for one or several cameras: camera picker, sleep/wake, AI tracking, presets, white balance, and a live preview",
   "kinds": [
     "bar-widget"
   ],
@@ -12,8 +12,8 @@
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "OBSBOT Camera",
-    "description": "Sleep/wake, AI tracking, white balance, HDR, recenter, and a live preview",
+    "displayName": "OBSBOT Cameras",
+    "description": "Pick a camera, then sleep/wake, AI tracking and mode, presets, HDR, white balance, recenter, and a live preview",
     "category": "System",
     "allowMultiple": false
   }
