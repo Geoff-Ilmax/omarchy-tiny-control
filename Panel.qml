@@ -262,6 +262,14 @@ Panel {
     selectProc.running = true
   }
 
+  function setGuard(on) {
+    if (guardSetProc.running) return
+    root.actionError = ""
+    root.guardActive = on
+    guardSetProc.command = ["systemctl", "--user", on ? "enable" : "disable", "--now", "tiny-guard.service"]
+    guardSetProc.running = true
+  }
+
   function preview() {
     if (haveCam) Quickshell.execDetached(["tiny-preview", root.selectedId, root.previewRes])
   }
@@ -347,7 +355,19 @@ Panel {
   Process {
     id: guardProc
     command: ["systemctl", "--user", "is-active", "tiny-guard.service"]
-    onExited: function(code, status) { root.guardActive = code === 0 && status === 0 }
+    onExited: function(code, status) {
+      if (!guardSetProc.running) root.guardActive = code === 0 && status === 0
+    }
+  }
+
+  // Turn the settings guard on or off, persistently (enable/disable --now).
+  Process {
+    id: guardSetProc
+    stderr: StdioCollector { id: guardStderr; waitForEnd: true }
+    onExited: function(code, status) {
+      if (code !== 0 || status !== 0) root.actionError = guardStderr.text.trim() || "Could not change tiny-guard.service"
+      guardProc.running = true
+    }
   }
 
   // Rotate the tagline only while the popup is open.
@@ -634,9 +654,22 @@ Panel {
           Text {
             width: parent.width
             visible: root.haveCam
-            text: "Power: " + root.powerPolicy + (root.guardActive ? " · guard active" : " · guard not running")
+            text: "Power: " + root.powerPolicy
             color: root.fg
             font.pixelSize: Style.font.caption
+          }
+          // tiny-guard re-applies each camera's saved settings and keeps a
+          // camera awake during calls; this stops or starts it (persistently).
+          SwitchRow {
+            width: parent.width
+            visible: root.haveCam
+            label: "Settings guard"
+            sub: root.guardActive ? "re-applies saved settings, wakes for calls"
+                                  : "off: settings not enforced, no auto-wake for calls"
+            value: root.guardActive
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.setGuard(!root.guardActive)
           }
           // Switches show confirmed hardware state; serialize actions and surface errors.
           SwitchRow {

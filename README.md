@@ -54,7 +54,8 @@ be enabled.
 
 The live preview additionally uses [`mpv`](https://mpv.io/). This widget itself
 installs nothing, runs no privileged commands, and writes no configuration of
-its own — it only invokes `tinyctl` and `tiny-preview`. (Choosing a camera runs
+its own — it only invokes `tinyctl` and `tiny-preview`, plus `systemctl
+--user` for its **Settings guard** switch (enable/disable `tiny-guard.service`). (Choosing a camera runs
 `tinyctl select`, which records the selection in tinyctl's own state file.)
 
 Coming from the upstream widget (`io.github.joshualambert.obsbot-tiny3`)?
