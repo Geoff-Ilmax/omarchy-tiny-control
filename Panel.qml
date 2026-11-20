@@ -66,6 +66,8 @@ Panel {
   // On-camera presets (from `tinyctl preset list --json`).
   property var presets: []          // [{ slot, occupied, name, power_on }]
   property int powerOnSlot: 0
+  // Only offered where `tinyctl preset power-on` is verified for the model.
+  property bool powerOnSupported: false
 
   // Preview capture resolution, chosen in the popup dropdown.
   property string previewRes: "1920x1080"
@@ -376,8 +378,12 @@ Panel {
         try {
           var j = JSON.parse(text)
           var unsupported = {}
-          for (var i = 0; i < j.features.length; i++)
+          var powerOn = false
+          for (var i = 0; i < j.features.length; i++) {
             if (j.features[i].support === "unsupported") unsupported[j.features[i].command] = true
+            if (j.features[i].command === "preset power-on" && j.features[i].support === "verified") powerOn = true
+          }
+          root.powerOnSupported = powerOn
           var modes = []
           for (var k = 0; k < root.allModes.length; k++)
             if (!unsupported[root.allModes[k].cmd])
@@ -385,6 +391,7 @@ Panel {
           root.trackModes = modes
         } catch (e) {
           root.trackModes = []
+          root.powerOnSupported = false
         }
       }
     }
@@ -629,6 +636,32 @@ Panel {
             onClicked: root.act(["preset", "recall", String(modelData.slot)])
           }
         }
+
+        // Make a preset the camera's power-on state (like OBSBOT Center's "As
+        // Initial State"): position plus its Additional settings.
+        Dropdown {
+          width: parent.width
+          visible: root.haveCam && root.powerOnSupported && root.presets.length > 0
+          enabled: root.stateValid && !root.busy
+          label: "Power-on preset"
+          value: String(root.powerOnSlot)
+          options: {
+            var o = root.powerOnSlot === 0 ? [{ value: "0", label: "Not one of the presets" }] : []
+            for (var i = 0; i < root.presets.length; i++) {
+              var p = root.presets[i]
+              o.push({ value: String(p.slot), label: "Preset " + p.slot + (p.name !== "" ? " · " + p.name : "") })
+            }
+            return o
+          }
+          onChanged: function(v) {
+            if (v !== "0" && v !== String(root.powerOnSlot)) {
+              root.powerOnSlot = parseInt(v)
+              root.act(["preset", "power-on", v])
+              presetRefresh.restart()
+            }
+          }
+        }
+        Timer { id: presetRefresh; interval: 3000; onTriggered: root.refreshCameraInfo() }
 
         PanelSeparator { foreground: root.fg; visible: root.haveCam }
 
