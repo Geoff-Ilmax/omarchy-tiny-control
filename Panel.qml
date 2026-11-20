@@ -586,19 +586,6 @@ Panel {
           onClicked: root.act(["auto"])
         }
 
-        Dropdown {
-          width: parent.width
-          visible: root.haveCam
-          label: "Preview resolution"
-          value: root.previewRes
-          options: [
-            { value: "1280x720", label: "720p" },
-            { value: "1920x1080", label: "1080p" },
-            { value: "3840x2160", label: "2160p (4K)" }
-          ]
-          onChanged: function(v) { root.previewRes = v }
-        }
-
         // --- gimbal ---
         PanelSeparator { foreground: root.fg; visible: root.haveCam }
         Text {
@@ -622,17 +609,18 @@ Panel {
             anchors.horizontalCenter: parent.horizontalCenter
             columns: 3
             spacing: Style.space(4)
-            readonly property real cell: Style.space(56)
+            readonly property real cell: Style.space(76)
+            readonly property real cellH: Style.space(52)
             readonly property bool can: root.stateValid && !root.busy && !root.asleep && !root.tracking_on
-            Item { width: pad.cell; height: 1 }
-            Button { width: pad.cell; foreground: root.fg; text: "▲"; enabled: pad.can; onClicked: root.nudgeTilt(1) }
-            Item { width: pad.cell; height: 1 }
-            Button { width: pad.cell; foreground: root.fg; text: "◀"; enabled: pad.can; onClicked: root.nudgePan(-1) }
-            Button { width: pad.cell; foreground: root.fg; text: "⌖"; enabled: pad.can; onClicked: root.act(["recenter"]) }
-            Button { width: pad.cell; foreground: root.fg; text: "▶"; enabled: pad.can; onClicked: root.nudgePan(1) }
-            Item { width: pad.cell; height: 1 }
-            Button { width: pad.cell; foreground: root.fg; text: "▼"; enabled: pad.can; onClicked: root.nudgeTilt(-1) }
-            Item { width: pad.cell; height: 1 }
+            Item { width: pad.cell; height: pad.cellH }
+            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "▲"; enabled: pad.can; onClicked: root.nudgeTilt(1) }
+            Item { width: pad.cell; height: pad.cellH }
+            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "◀"; enabled: pad.can; onClicked: root.nudgePan(1) }
+            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "⌖"; enabled: pad.can; onClicked: root.act(["recenter"]) }
+            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "▶"; enabled: pad.can; onClicked: root.nudgePan(-1) }
+            Item { width: pad.cell; height: pad.cellH }
+            Button { width: pad.cell; height: pad.cellH; foreground: root.fg; text: "▼"; enabled: pad.can; onClicked: root.nudgeTilt(-1) }
+            Item { width: pad.cell; height: pad.cellH }
           }
         }
         Row {
@@ -656,6 +644,19 @@ Panel {
           onSwitched: root.fineControl = !root.fineControl
         }
         PanelSeparator { foreground: root.fg; visible: root.haveCam }
+        Dropdown {
+          width: parent.width
+          visible: root.haveCam
+          label: "Preview resolution"
+          value: root.previewRes
+          options: [
+            { value: "1280x720", label: "720p" },
+            { value: "1920x1080", label: "1080p" },
+            { value: "3840x2160", label: "2160p (4K)" }
+          ]
+          onChanged: function(v) { root.previewRes = v }
+        }
+
         Button {
           width: parent.width
           visible: root.haveCam
