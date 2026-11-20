@@ -236,6 +236,13 @@ Panel {
     runUiQueue()
   }
   property var uiQueue: []
+  // Global: desktop notifications from tiny-remote (`tinyctl notify`).
+  property bool remoteNotifications: false
+  function setRemoteNotifications(on) {
+    root.remoteNotifications = on
+    uiQueue.push(["tinyctl", "notify", on ? "on" : "off"])
+    runUiQueue()
+  }
   function runUiQueue() {
     if (uiProc.running || uiQueue.length === 0) return
     uiProc.command = uiQueue.shift()
@@ -365,6 +372,8 @@ Panel {
           root.autoWb = j.auto_wb === true
           root.wbTemp = j.wb_temp | 0
           root.hdr = j.hdr === true
+          if (typeof j.notifications === "boolean" && !uiProc.running && root.uiQueue.length === 0)
+            root.remoteNotifications = j.notifications
           if (j.ui && !uiProc.running && root.uiQueue.length === 0) {
             root.fineControl = j.ui.fine_control === true
             root.swapPan = j.ui.swap_pan === true
@@ -724,6 +733,19 @@ Panel {
           Timer { id: presetRefresh; interval: 3000; onTriggered: root.refreshCameraInfo() }
 
           PanelSeparator { foreground: root.fg; visible: root.haveCam }
+
+          // Applies to all cameras: notifications from the OBSBOT remote
+          // (tiny-remote). Off by default.
+          SwitchRow {
+            width: parent.width
+            visible: root.haveCam
+            label: "Remote notifications"
+            sub: "OBSBOT remote: modes, presets, errors"
+            value: root.remoteNotifications
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.setRemoteNotifications(!root.remoteNotifications)
+          }
 
           Button {
             width: parent.width

@@ -21,7 +21,7 @@ it is the front-end for [tiny-control](https://github.com/Geoff-Ilmax/tiny-contr
   the popup, right-click toggles sleep, middle-click opens the live preview, all
   for the selected camera. The tooltip names it.
 - **Tabs** — **Camera** (switches, tracking mode, presets, power-on preset,
-  preview), **Gimbal** (position, D-pad, zoom, fine control, axis swaps) and
+  preview, and a **Remote notifications** switch for the OBSBOT remote), **Gimbal** (position, D-pad, zoom, fine control, axis swaps) and
   **Image** (hue, contrast, saturation and sharpness with −/+ in steps of 5,
   or 1 with Fine control, and a reset to the camera's defaults).
 - **Popup** — switches for sleep/wake, AI tracking, HDR and auto white balance;
