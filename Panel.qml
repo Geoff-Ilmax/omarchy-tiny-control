@@ -42,6 +42,11 @@ Panel {
   property bool autoWb: true
   property int wbTemp: 4000
   property bool hdr: false
+  // Popup tab: 0 Camera, 1 Gimbal, 2 Image.
+  property int currentTab: 0
+  // {hue:{value,min,max,default}, contrast:…} from `status --json`.
+  property var imageCtl: ({})
+  property bool imageFine: false
   // Gimbal (UVC readback = last host-commanded angle; see tinyctl README).
   property real panDeg: 0
   property real tiltDeg: 0
@@ -204,6 +209,15 @@ Panel {
     root.tiltDeg = t
     root.act(["tilt", String(t)])
   }
+  function nudgeImage(key, dir) {
+    var c = root.imageCtl[key]
+    if (!c) return
+    var t = Math.max(c.min, Math.min(c.max, c.value + dir * (root.imageFine ? 1 : 5)))
+    var copy = Object.assign({}, root.imageCtl)
+    copy[key] = Object.assign({}, c, { value: t })
+    root.imageCtl = copy
+    root.act(["image", key, String(t)])
+  }
   function nudgeZoom(dir) {
     var t = Math.max(0, Math.min(100, root.zoomVal + dir * 10))
     root.zoomVal = t
@@ -356,6 +370,7 @@ Panel {
             root.swapPan = j.ui.swap_pan === true
             root.swapTilt = j.ui.swap_tilt === true
           }
+          if (j.image && !actionProc.running) root.imageCtl = j.image
           root.panDeg = Number(j.pan_deg) || 0
           root.tiltDeg = Number(j.tilt_deg) || 0
           root.zoomVal = j.zoom | 0
@@ -549,8 +564,6 @@ Panel {
                + (root.hdr ? " · HDR" : ""))
         }
 
-        PanelSeparator { foreground: root.fg }
-
         Text {
           width: parent.width
           visible: root.actionError !== ""
@@ -559,219 +572,336 @@ Panel {
           wrapMode: Text.WordWrap
           font.pixelSize: Style.font.caption
         }
-        Text {
-          width: parent.width
+
+        // --- tabs: Camera | Gimbal | Image ---
+        Row {
+          id: tabRow
           visible: root.haveCam
-          text: root.busy ? "Checking camera…" : "Power: " + root.powerPolicy + (root.guardActive ? " · guard active" : " · guard not running")
-          color: root.fg
-          font.pixelSize: Style.font.caption
-        }
-        // Switches show confirmed hardware state; serialize actions and surface errors.
-        SwitchRow {
           width: parent.width
-          visible: root.haveCam
-          label: "Awake"
-          sub: root.asleep ? "camera asleep" : ""
-          value: !root.asleep
-          fg: root.fg
-          fam: root.fam
-          onSwitched: root.act([root.asleep ? "wake" : "sleep"])
-        }
-        SwitchRow {
-          width: parent.width
-          visible: root.haveCam
-          label: "AI tracking"
-          value: root.tracking !== "off"
-          fg: root.fg
-          fam: root.fam
-          onSwitched: root.act(["track", root.tracking === "off" ? "on" : "off"])
-        }
-        Dropdown {
-          width: parent.width
-          visible: root.haveCam && root.trackModes.length > 0
-          enabled: root.stateValid && !root.busy
-          label: "Tracking mode"
-          value: root.tracking
-          options: {
-            var o = [{ value: "off", label: "Off" }]
-            for (var i = 0; i < root.trackModes.length; i++) o.push(root.trackModes[i])
-            return o
+          readonly property var names: ["Camera", "Gimbal", "Image"]
+          Repeater {
+            model: tabRow.names
+            delegate: Item {
+              id: tab
+              required property int index
+              required property string modelData
+              readonly property bool active: root.currentTab === tab.index
+              width: tabRow.width / tabRow.names.length
+              implicitHeight: tabLabel.implicitHeight + Style.space(14)
+              Text {
+                id: tabLabel
+                anchors.centerIn: parent
+                text: tab.modelData
+                color: tab.active ? Color.accent : root.fg
+                opacity: tab.active ? 1 : 0.7
+                font.family: root.fam
+                font.pixelSize: Style.font.subtitle
+                font.bold: tab.active
+              }
+              Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Style.space(tab.active ? 3 : 1)
+                color: tab.active ? Color.accent : Qt.darker(root.fg, 2.2)
+              }
+              MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.currentTab = tab.index
+              }
+            }
           }
-          onChanged: function(v) { if (v !== root.tracking) root.act(["track", v]) }
-        }
-        SwitchRow {
-          width: parent.width
-          visible: root.haveCam
-          label: "HDR"
-          value: root.hdr
-          fg: root.fg
-          fam: root.fam
-          onSwitched: root.act(["hdr", root.hdr ? "off" : "on"])
-        }
-        SwitchRow {
-          width: parent.width
-          visible: root.haveCam
-          label: "Auto white balance"
-          sub: root.autoWb ? "" : ("pinned " + root.wbTemp + "K")
-          value: root.autoWb
-          fg: root.fg
-          fam: root.fam
-          onSwitched: root.act(["wb", root.autoWb ? "pin" : "auto"])
         }
 
-        // On-camera presets (the same slots OBSBOT Center uses). Recall also
-        // applies the preset's saved tracking and image settings.
-        PanelSeparator { foreground: root.fg; visible: root.haveCam && root.presets.length > 0 }
-        Repeater {
-          model: root.haveCam ? root.presets : []
-          delegate: Button {
-            required property var modelData
-            width: column.width
+        // Camera tab
+        Column {
+          width: parent.width
+          spacing: Style.space(6)
+          visible: root.haveCam && root.currentTab === 0
+          Text {
+            width: parent.width
+            visible: root.haveCam
+            text: root.busy ? "Checking camera…" : "Power: " + root.powerPolicy + (root.guardActive ? " · guard active" : " · guard not running")
+            color: root.fg
+            font.pixelSize: Style.font.caption
+          }
+          // Switches show confirmed hardware state; serialize actions and surface errors.
+          SwitchRow {
+            width: parent.width
+            visible: root.haveCam
+            label: "Awake"
+            sub: root.asleep ? "camera asleep" : ""
+            value: !root.asleep
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.act([root.asleep ? "wake" : "sleep"])
+          }
+          SwitchRow {
+            width: parent.width
+            visible: root.haveCam
+            label: "AI tracking"
+            value: root.tracking !== "off"
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.act(["track", root.tracking === "off" ? "on" : "off"])
+          }
+          Dropdown {
+            width: parent.width
+            visible: root.haveCam && root.trackModes.length > 0
+            enabled: root.stateValid && !root.busy
+            label: "Tracking mode"
+            value: root.tracking
+            options: {
+              var o = [{ value: "off", label: "Off" }]
+              for (var i = 0; i < root.trackModes.length; i++) o.push(root.trackModes[i])
+              return o
+            }
+            onChanged: function(v) { if (v !== root.tracking) root.act(["track", v]) }
+          }
+          SwitchRow {
+            width: parent.width
+            visible: root.haveCam
+            label: "HDR"
+            value: root.hdr
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.act(["hdr", root.hdr ? "off" : "on"])
+          }
+          SwitchRow {
+            width: parent.width
+            visible: root.haveCam
+            label: "Auto white balance"
+            sub: root.autoWb ? "" : ("pinned " + root.wbTemp + "K")
+            value: root.autoWb
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.act(["wb", root.autoWb ? "pin" : "auto"])
+          }
+
+          // On-camera presets (the same slots OBSBOT Center uses). Recall also
+          // applies the preset's saved tracking and image settings.
+          PanelSeparator { foreground: root.fg; visible: root.haveCam && root.presets.length > 0 }
+          Repeater {
+            model: root.haveCam ? root.presets : []
+            delegate: Button {
+              required property var modelData
+              width: column.width
+              leftAlign: true
+              foreground: root.fg
+              enabled: root.stateValid && !root.busy && !root.asleep
+              text: "Preset " + modelData.slot
+                    + (modelData.name !== "" ? " · " + modelData.name : "")
+                    + (root.powerOnSlot === modelData.slot ? "  (power-on)" : "")
+              onClicked: root.act(["preset", "recall", String(modelData.slot)])
+            }
+          }
+
+          // Make a preset the camera's power-on state (like OBSBOT Center's "As
+          // Initial State"): position plus its Additional settings.
+          Dropdown {
+            width: parent.width
+            visible: root.haveCam && root.powerOnSupported && root.presets.length > 0
+            enabled: root.stateValid && !root.busy
+            label: "Power-on preset"
+            value: String(root.powerOnSlot)
+            options: {
+              var o = root.powerOnSlot === 0 ? [{ value: "0", label: "Not one of the presets" }] : []
+              for (var i = 0; i < root.presets.length; i++) {
+                var p = root.presets[i]
+                o.push({ value: String(p.slot), label: "Preset " + p.slot + (p.name !== "" ? " · " + p.name : "") })
+              }
+              return o
+            }
+            onChanged: function(v) {
+              if (v !== "0" && v !== String(root.powerOnSlot)) {
+                root.powerOnSlot = parseInt(v)
+                root.act(["preset", "power-on", v])
+                presetRefresh.restart()
+              }
+            }
+          }
+          Timer { id: presetRefresh; interval: 3000; onTriggered: root.refreshCameraInfo() }
+
+          PanelSeparator { foreground: root.fg; visible: root.haveCam }
+
+          Button {
+            width: parent.width
+            visible: root.haveCam
+            foreground: root.fg
+            text: "Wake automatically for calls"
+            enabled: !root.busy
+            onClicked: root.act(["auto"])
+          }
+
+          Dropdown {
+            width: parent.width
+            visible: root.haveCam
+            label: "Preview resolution"
+            value: root.previewRes
+            options: [
+              { value: "1280x720", label: "720p" },
+              { value: "1920x1080", label: "1080p" },
+              { value: "3840x2160", label: "2160p (4K)" }
+            ]
+            onChanged: function(v) { root.previewRes = v }
+          }
+
+          Button {
+            width: parent.width
+            visible: root.haveCam
             leftAlign: true
             foreground: root.fg
-            enabled: root.stateValid && !root.busy && !root.asleep
-            text: "Preset " + modelData.slot
-                  + (modelData.name !== "" ? " · " + modelData.name : "")
-                  + (root.powerOnSlot === modelData.slot ? "  (power-on)" : "")
-            onClicked: root.act(["preset", "recall", String(modelData.slot)])
+            text: "Live preview"
+            onClicked: root.preview()
           }
         }
 
-        // Make a preset the camera's power-on state (like OBSBOT Center's "As
-        // Initial State"): position plus its Additional settings.
-        Dropdown {
+        // Gimbal tab
+        Column {
           width: parent.width
-          visible: root.haveCam && root.powerOnSupported && root.presets.length > 0
-          enabled: root.stateValid && !root.busy
-          label: "Power-on preset"
-          value: String(root.powerOnSlot)
-          options: {
-            var o = root.powerOnSlot === 0 ? [{ value: "0", label: "Not one of the presets" }] : []
-            for (var i = 0; i < root.presets.length; i++) {
-              var p = root.presets[i]
-              o.push({ value: String(p.slot), label: "Preset " + p.slot + (p.name !== "" ? " · " + p.name : "") })
+          spacing: Style.space(6)
+          visible: root.haveCam && root.currentTab === 1
+          Text {
+            width: parent.width
+            visible: root.haveCam
+            color: root.fg
+            font.family: root.fam
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+            text: "Gimbal · pan " + Math.round(root.panDeg) + "°, tilt " + Math.round(root.tiltDeg)
+                  + "°, zoom " + root.zoomVal
+                  + (root.tracking_on ? "\nAI tracking is steering — turn it off (or use Desk mode) to move manually" : "")
+          }
+          // D-pad: up on top, left / center / right in the middle, down below.
+          Item {
+            visible: root.haveCam
+            width: parent.width
+            implicitHeight: pad.implicitHeight
+            Grid {
+              id: pad
+              anchors.horizontalCenter: parent.horizontalCenter
+              columns: 3
+              spacing: Style.space(4)
+              readonly property real cell: Style.space(76)
+              readonly property real cellH: Style.space(52)
+              readonly property bool can: root.stateValid && !root.busy && !root.asleep && !root.tracking_on
+              Item { width: pad.cell; height: pad.cellH }
+              PadButton { width: pad.cell; height: pad.cellH; glyph: "▲"; enabled: pad.can; onClicked: root.nudgeTilt(1) }
+              Item { width: pad.cell; height: pad.cellH }
+              PadButton { width: pad.cell; height: pad.cellH; glyph: "◀"; enabled: pad.can; onClicked: root.nudgePan(1) }
+              PadButton { width: pad.cell; height: pad.cellH; glyph: "⌖"; enabled: pad.can; onClicked: root.act(["recenter"]) }
+              PadButton { width: pad.cell; height: pad.cellH; glyph: "▶"; enabled: pad.can; onClicked: root.nudgePan(-1) }
+              Item { width: pad.cell; height: pad.cellH }
+              PadButton { width: pad.cell; height: pad.cellH; glyph: "▼"; enabled: pad.can; onClicked: root.nudgeTilt(-1) }
+              Item { width: pad.cell; height: pad.cellH }
             }
-            return o
           }
-          onChanged: function(v) {
-            if (v !== "0" && v !== String(root.powerOnSlot)) {
-              root.powerOnSlot = parseInt(v)
-              root.act(["preset", "power-on", v])
-              presetRefresh.restart()
-            }
-          }
-        }
-        Timer { id: presetRefresh; interval: 3000; onTriggered: root.refreshCameraInfo() }
-
-        PanelSeparator { foreground: root.fg; visible: root.haveCam }
-
-        Button {
-          width: parent.width
-          visible: root.haveCam
-          foreground: root.fg
-          text: "Wake automatically for calls"
-          enabled: !root.busy
-          onClicked: root.act(["auto"])
-        }
-
-        // --- gimbal ---
-        PanelSeparator { foreground: root.fg; visible: root.haveCam }
-        Text {
-          width: parent.width
-          visible: root.haveCam
-          color: root.fg
-          font.family: root.fam
-          font.pixelSize: Style.font.caption
-          wrapMode: Text.WordWrap
-          text: "Gimbal · pan " + Math.round(root.panDeg) + "°, tilt " + Math.round(root.tiltDeg)
-                + "°, zoom " + root.zoomVal
-                + (root.tracking_on ? "\nAI tracking is steering — turn it off (or use Desk mode) to move manually" : "")
-        }
-        // D-pad: up on top, left / center / right in the middle, down below.
-        Item {
-          visible: root.haveCam
-          width: parent.width
-          implicitHeight: pad.implicitHeight
-          Grid {
-            id: pad
-            anchors.horizontalCenter: parent.horizontalCenter
-            columns: 3
+          Row {
+            id: zoomRow
+            visible: root.haveCam
+            width: parent.width
             spacing: Style.space(4)
-            readonly property real cell: Style.space(76)
-            readonly property real cellH: Style.space(52)
-            readonly property bool can: root.stateValid && !root.busy && !root.asleep && !root.tracking_on
-            Item { width: pad.cell; height: pad.cellH }
-            PadButton { width: pad.cell; height: pad.cellH; glyph: "▲"; enabled: pad.can; onClicked: root.nudgeTilt(1) }
-            Item { width: pad.cell; height: pad.cellH }
-            PadButton { width: pad.cell; height: pad.cellH; glyph: "◀"; enabled: pad.can; onClicked: root.nudgePan(1) }
-            PadButton { width: pad.cell; height: pad.cellH; glyph: "⌖"; enabled: pad.can; onClicked: root.act(["recenter"]) }
-            PadButton { width: pad.cell; height: pad.cellH; glyph: "▶"; enabled: pad.can; onClicked: root.nudgePan(-1) }
-            Item { width: pad.cell; height: pad.cellH }
-            PadButton { width: pad.cell; height: pad.cellH; glyph: "▼"; enabled: pad.can; onClicked: root.nudgeTilt(-1) }
-            Item { width: pad.cell; height: pad.cellH }
+            readonly property real cell: (width - spacing) / 2
+            readonly property bool can: root.stateValid && !root.busy && !root.asleep
+            Button { width: zoomRow.cell; foreground: root.fg; text: "Zoom −"; enabled: zoomRow.can; onClicked: root.nudgeZoom(-1) }
+            Button { width: zoomRow.cell; foreground: root.fg; text: "Zoom +"; enabled: zoomRow.can; onClicked: root.nudgeZoom(1) }
+          }
+          SwitchRow {
+            width: parent.width
+            visible: root.haveCam
+            label: "Fine control"
+            sub: root.fineControl ? "1° steps" : "5° steps"
+            value: root.fineControl
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.setUi("fine_control", !root.fineControl)
+          }
+          SwitchRow {
+            width: parent.width
+            visible: root.haveCam
+            label: "Swap left/right"
+            sub: root.swapPan ? "◀ ▶ inverted" : ""
+            value: root.swapPan
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.setUi("swap_pan", !root.swapPan)
+          }
+          SwitchRow {
+            width: parent.width
+            visible: root.haveCam
+            label: "Swap up/down"
+            sub: root.swapTilt ? "▲ ▼ inverted" : ""
+            value: root.swapTilt
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.setUi("swap_tilt", !root.swapTilt)
           }
         }
-        Row {
-          id: zoomRow
-          visible: root.haveCam
-          width: parent.width
-          spacing: Style.space(4)
-          readonly property real cell: (width - spacing) / 2
-          readonly property bool can: root.stateValid && !root.busy && !root.asleep
-          Button { width: zoomRow.cell; foreground: root.fg; text: "Zoom −"; enabled: zoomRow.can; onClicked: root.nudgeZoom(-1) }
-          Button { width: zoomRow.cell; foreground: root.fg; text: "Zoom +"; enabled: zoomRow.can; onClicked: root.nudgeZoom(1) }
-        }
-        SwitchRow {
-          width: parent.width
-          visible: root.haveCam
-          label: "Fine control"
-          sub: root.fineControl ? "1° steps" : "5° steps"
-          value: root.fineControl
-          fg: root.fg
-          fam: root.fam
-          onSwitched: root.setUi("fine_control", !root.fineControl)
-        }
-        SwitchRow {
-          width: parent.width
-          visible: root.haveCam
-          label: "Swap left/right"
-          sub: root.swapPan ? "◀ ▶ inverted" : ""
-          value: root.swapPan
-          fg: root.fg
-          fam: root.fam
-          onSwitched: root.setUi("swap_pan", !root.swapPan)
-        }
-        SwitchRow {
-          width: parent.width
-          visible: root.haveCam
-          label: "Swap up/down"
-          sub: root.swapTilt ? "▲ ▼ inverted" : ""
-          value: root.swapTilt
-          fg: root.fg
-          fam: root.fam
-          onSwitched: root.setUi("swap_tilt", !root.swapTilt)
-        }
-        PanelSeparator { foreground: root.fg; visible: root.haveCam }
-        Dropdown {
-          width: parent.width
-          visible: root.haveCam
-          label: "Preview resolution"
-          value: root.previewRes
-          options: [
-            { value: "1280x720", label: "720p" },
-            { value: "1920x1080", label: "1080p" },
-            { value: "3840x2160", label: "2160p (4K)" }
-          ]
-          onChanged: function(v) { root.previewRes = v }
-        }
 
-        Button {
+        // Image tab: the camera's hue / contrast / saturation / sharpness.
+        Column {
           width: parent.width
-          visible: root.haveCam
-          leftAlign: true
-          foreground: root.fg
-          text: "Live preview"
-          onClicked: root.preview()
+          spacing: Style.space(6)
+          visible: root.haveCam && root.currentTab === 2
+          Repeater {
+            model: [
+              { key: "hue", label: "Hue" },
+              { key: "contrast", label: "Contrast" },
+              { key: "saturation", label: "Saturation" },
+              { key: "sharpness", label: "Sharpness" }
+            ]
+            delegate: Item {
+              id: imgRow
+              required property var modelData
+              readonly property var ctl: root.imageCtl[imgRow.modelData.key]
+              readonly property bool can: root.stateValid && !root.busy && imgRow.ctl !== undefined
+              visible: imgRow.ctl !== undefined
+              width: parent ? parent.width : root.rowW
+              implicitHeight: Math.max(imgLabel.implicitHeight, imgButtons.implicitHeight) + Style.space(6)
+              Column {
+                id: imgLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                Text {
+                  text: imgRow.modelData.label
+                  color: root.fg
+                  font.family: root.fam
+                  font.pixelSize: Style.font.subtitle
+                }
+                Text {
+                  text: imgRow.ctl ? (imgRow.ctl.value + "   (default " + imgRow.ctl["default"] + ")") : ""
+                  color: Qt.darker(root.fg, 1.4)
+                  font.family: root.fam
+                  font.pixelSize: Style.font.caption
+                }
+              }
+              Row {
+                id: imgButtons
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(4)
+                PadButton { width: Style.space(52); height: Style.space(40); glyph: "−"; enabled: imgRow.can; onClicked: root.nudgeImage(imgRow.modelData.key, -1) }
+                PadButton { width: Style.space(52); height: Style.space(40); glyph: "+"; enabled: imgRow.can; onClicked: root.nudgeImage(imgRow.modelData.key, 1) }
+              }
+            }
+          }
+          SwitchRow {
+            width: parent.width
+            label: "Fine control"
+            sub: root.imageFine ? "steps of 1" : "steps of 5"
+            value: root.imageFine
+            fg: root.fg
+            fam: root.fam
+            onSwitched: root.imageFine = !root.imageFine
+          }
+          Button {
+            width: parent.width
+            foreground: root.fg
+            text: "Reset to camera defaults"
+            enabled: root.stateValid && !root.busy
+            onClicked: root.act(["image", "reset"])
+          }
         }
       }
     }
