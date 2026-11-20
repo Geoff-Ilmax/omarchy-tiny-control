@@ -50,12 +50,13 @@ Panel {
   property real panMax: 130
   property real tiltMin: -90
   property real tiltMax: 90
-  // 5° steps; "Fine control" switches to 1°.
+  // Per-camera pad preferences, saved by tinyctl in the camera's config
+  // section (`tinyctl -c <cam> ui …`) and read back through `status --json`.
+  // 5° steps; "Fine control" switches to 1°. The swaps invert one axis each.
   property bool fineControl: false
+  property bool swapPan: false
+  property bool swapTilt: false
   readonly property int gimbalStep: fineControl ? 1 : 5
-  // "Reverse controls" inverts both axes of the D-pad.
-  property bool reverseControls: false
-  readonly property int gimbalDir: reverseControls ? -1 : 1
   // Modes where the camera steers the gimbal itself. Desk mode only frames
   // the desk, so manual adjustment stays available there.
   readonly property bool tracking_on: tracking !== "off" && tracking !== "desk"
@@ -192,12 +193,12 @@ Panel {
 
   // Step the gimbal from its last known position, within the camera's range.
   function nudgePan(dir) {
-    var t = Math.max(root.panMin, Math.min(root.panMax, Math.round(root.panDeg + dir * root.gimbalDir * root.gimbalStep)))
+    var t = Math.max(root.panMin, Math.min(root.panMax, Math.round(root.panDeg + dir * (root.swapPan ? -1 : 1) * root.gimbalStep)))
     root.panDeg = t
     root.act(["pan", String(t)])
   }
   function nudgeTilt(dir) {
-    var t = Math.max(root.tiltMin, Math.min(root.tiltMax, Math.round(root.tiltDeg + dir * root.gimbalDir * root.gimbalStep)))
+    var t = Math.max(root.tiltMin, Math.min(root.tiltMax, Math.round(root.tiltDeg + dir * (root.swapTilt ? -1 : 1) * root.gimbalStep)))
     root.tiltDeg = t
     root.act(["tilt", String(t)])
   }
@@ -205,6 +206,24 @@ Panel {
     var t = Math.max(0, Math.min(100, root.zoomVal + dir * 10))
     root.zoomVal = t
     root.act(["zoom", String(t)])
+  }
+
+  // Save a pad preference for the selected camera (optimistic; the next
+  // status poll confirms it).
+  function setUi(name, on) {
+    if (name === "fine_control") root.fineControl = on
+    else if (name === "swap_pan") root.swapPan = on
+    else if (name === "swap_tilt") root.swapTilt = on
+    // Own process: a preference save must not be dropped because a status
+    // poll happens to be running (act() refuses while busy).
+    uiQueue.push(["tinyctl", "-c", root.selectedId, "ui", name, on ? "on" : "off"])
+    runUiQueue()
+  }
+  property var uiQueue: []
+  function runUiQueue() {
+    if (uiProc.running || uiQueue.length === 0) return
+    uiProc.command = uiQueue.shift()
+    uiProc.running = true
   }
 
   function selectCamera(id) {
@@ -272,6 +291,15 @@ Panel {
   }
 
   Process {
+    id: uiProc
+    stderr: StdioCollector { id: uiStderr; waitForEnd: true }
+    onExited: function(code, status) {
+      if (code !== 0 || status !== 0) root.actionError = uiStderr.text.trim() || "Could not save the setting"
+      root.runUiQueue()
+    }
+  }
+
+  Process {
     id: selectProc
     stderr: StdioCollector { id: selectStderr; waitForEnd: true }
     onExited: function(code, status) {
@@ -321,6 +349,11 @@ Panel {
           root.autoWb = j.auto_wb === true
           root.wbTemp = j.wb_temp | 0
           root.hdr = j.hdr === true
+          if (j.ui && !uiProc.running && root.uiQueue.length === 0) {
+            root.fineControl = j.ui.fine_control === true
+            root.swapPan = j.ui.swap_pan === true
+            root.swapTilt = j.ui.swap_tilt === true
+          }
           root.panDeg = Number(j.pan_deg) || 0
           root.tiltDeg = Number(j.tilt_deg) || 0
           root.zoomVal = j.zoom | 0
@@ -663,17 +696,27 @@ Panel {
           value: root.fineControl
           fg: root.fg
           fam: root.fam
-          onSwitched: root.fineControl = !root.fineControl
+          onSwitched: root.setUi("fine_control", !root.fineControl)
         }
         SwitchRow {
           width: parent.width
           visible: root.haveCam
-          label: "Reverse controls"
-          sub: root.reverseControls ? "arrows inverted" : ""
-          value: root.reverseControls
+          label: "Swap left/right"
+          sub: root.swapPan ? "◀ ▶ inverted" : ""
+          value: root.swapPan
           fg: root.fg
           fam: root.fam
-          onSwitched: root.reverseControls = !root.reverseControls
+          onSwitched: root.setUi("swap_pan", !root.swapPan)
+        }
+        SwitchRow {
+          width: parent.width
+          visible: root.haveCam
+          label: "Swap up/down"
+          sub: root.swapTilt ? "▲ ▼ inverted" : ""
+          value: root.swapTilt
+          fg: root.fg
+          fam: root.fam
+          onSwitched: root.setUi("swap_tilt", !root.swapTilt)
         }
         PanelSeparator { foreground: root.fg; visible: root.haveCam }
         Dropdown {

@@ -24,7 +24,7 @@ it is the front-end for [tiny-control](https://github.com/Geoff-Ilmax/tiny-contr
   a tracking-mode picker that only offers modes the camera's model supports;
   buttons for the camera's own presets 1–3 (named as in OBSBOT Center, power-on
   preset marked); a gimbal D-pad (▲ ◀ ⌖ ▶ ▼, 5° steps or
-  1° with **Fine control**, **Reverse controls** to invert the arrows, within the camera's range; ⌖ recenters; disabled
+  1° with **Fine control**, **Swap left/right** and **Swap up/down** to invert an axis — all three saved per camera by tinyctl — within the camera's range; ⌖ recenters; disabled
   while AI tracking is steering, but available in Desk mode) and zoom −/+; a preview-resolution picker; and **Live preview** for the
   selected camera.
 
